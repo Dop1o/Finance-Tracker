@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-XSS-Protection" content="1; mode=block">
+    
+    <!-- SEO Meta Tags -->
+    <title>MoneyTrack — Финансовый трекер для контроля расходов и доходов</title>
+    <meta name="description" content="MoneyTrack — бесплатный финансовый трекер с офлайн-доступом. Отслеживайте расходы и доходы, стройте графики, экспортируйте в Excel. Работает без интернета.">
+    <meta name="keywords" content="финансовый трекер, учёт расходов, учёт доходов, личные финансы, бюджет, деньги, трекер бюджета, MoneyTrack">
+    <meta name="author" content="MoneyTrack">
+    <meta name="robots" content="index, follow">
+    <meta name="language" content="ru">
+    <meta name="revisit-after" content="7 days">
+    
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="MoneyTrack — Финансовый трекер">
+    <meta property="og:description" content="Отслеживайте расходы и доходы, стройте графики, управляйте бюджетом. Работает офлайн.">
+    <meta property="og:image" content="icons/icon-512.png">
+    <meta property="og:image:width" content="512">
+    <meta property="og:image:height" content="512">
+    <meta property="og:locale" content="ru_RU">
+    <meta property="og:site_name" content="MoneyTrack">
+    
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="MoneyTrack — Финансовый трекер">
+    <meta name="twitter:description" content="Отслеживайте расходы и доходы, стройте графики, управляйте бюджетом. Работает офлайн.">
+    <meta name="twitter:image" content="icons/icon-512.png">
+    
+    <!-- PWA Theme -->
+    <meta name="theme-color" content="#10b981">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="MoneyTrack">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="icons/icon-192.png">
+    <link rel="shortcut icon" href="icons/icon-192.png" type="image/png">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="mask-icon" href="icons/icon-192.png" color="#10b981">
+    
+    <!-- Динамический PWA manifest (русский/английский) -->
+    <script>
+        (function() {
+            // Определяем текущий язык
+            let currentLang = 'ru';
+            try {
+                const savedLang = localStorage.getItem('moneytrack_language');
+                const browserLang = navigator.language.startsWith('en') ? 'en' : 'ru';
+                currentLang = savedLang || browserLang;
+            } catch(e) {}
+            
+            // Выбираем нужный манифест
+            const manifestFile = currentLang === 'ru' ? 'manifest-ru.json' : 'manifest-en.json';
+            
+            // Создаём ссылку на манифест
+            const link = document.createElement('link');
+            link.rel = 'manifest';
+            link.href = manifestFile;
+            link.id = 'mtManifestLink';
+            document.head.appendChild(link);
+        })();
+    </script>
+    
+    <!-- Preconnect для улучшения скорости загрузки -->
+    <link rel="preconnect" href="https://cdn.tailwindcss.com" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="dns-prefetch" href="https://api.exchangerate-api.com">
+    
+    <!-- Стили и скрипты -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous">
+    <link rel="stylesheet" href="custom.css">
+    
+    <script>
+        if (window.tailwind) {
+            tailwind.config = {
+                darkMode: 'class',
+                theme: { extend: {} }
+            }
+        }
+    </script>
+</head>
+<body class="min-h-screen antialiased pad-bot-nav overflow-x-hidden">
+    <div id="app-skeleton" aria-busy="true">
+        <div class="sk w-40"></div>
+        <div class="sk-block"></div>
+        <div class="sk-block"></div>
+    </div>
+
+    <header id="mt-top-anchor" class="fixed top-0 left-0 right-0 z-[100] border-b border-slate-600/20 bg-[var(--mt-surface)]/95 backdrop-blur-md">
+        <div class="max-w-[1400px] mx-auto px-3 sm:px-4 py-2.5 sm:py-3 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+            <button type="button" id="mtBrandBtn" class="mt-brand flex items-center gap-2 text-emerald-500 font-bold text-base sm:text-lg min-w-0 shrink text-left rounded-lg px-1 -ml-1 py-0.5 border-0 bg-transparent" aria-label="MoneyTrack">
+                <i class="fas fa-wallet shrink-0" aria-hidden="true"></i>
+                <span class="truncate">MoneyTrack</span>
+            </button>
+            <div id="currentDate" class="text-xs sm:text-sm text-[var(--mt-muted)] w-full text-center md:w-auto order-3 md:order-none min-w-0"></div>
+            <div class="flex flex-wrap items-stretch gap-1.5 sm:gap-2 shrink-0 mt-header-tools">
+                <label class="sr-only" for="currencySelect" data-i18n="profileCurrency">Валюта</label>
+                <select id="currencySelect" autocomplete="off" class="hidden md:flex md:items-center md:justify-center text-sm rounded-lg bg-[var(--mt-surface-2)] text-[var(--mt-text)] border border-slate-600/30 px-3 h-11 min-h-[44px] mt-select-header"></select>
+                <button type="button" id="themeToggle" class="mt-btn-icon h-11 min-h-[44px] w-11 min-w-[44px] shrink-0 rounded-lg bg-[var(--mt-surface-2)] text-[var(--mt-muted)] hover:text-emerald-500 transition flex items-center justify-center" aria-label="Theme">
+                    <i class="fas fa-moon" id="themeIcon" aria-hidden="true"></i>
+                </button>
+                <button type="button" id="languageToggle" class="mt-btn-icon h-11 min-h-[44px] min-w-[44px] px-2.5 sm:px-3 shrink-0 rounded-lg bg-[var(--mt-surface-2)] text-sm text-[var(--mt-muted)] flex items-center justify-center gap-1" aria-label="Language">
+                    <i class="fas fa-globe shrink-0" aria-hidden="true"></i>
+                    <span id="languageText">RU</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main id="mainApp" class="max-w-[1400px] mx-auto w-full min-w-0 px-3 sm:px-4 pt-[5.5rem] sm:pt-[4.75rem] md:pt-20 pb-8 grid gap-3 md:gap-4 lg:gap-6 md:grid-cols-12 md:items-stretch opacity-0 pointer-events-none transition-opacity duration-300">
+
+        <div id="welcomeBanner" class="mt-welcome mt-tab-panel active md:col-span-12 rounded-2xl border border-emerald-500/25 bg-gradient-to-br from-emerald-500/10 via-[var(--mt-surface)] to-[var(--mt-surface)] p-4 sm:p-5 shadow-lg scroll-mt-24 hidden" data-tab="home" role="region" aria-labelledby="welcomeHeading">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div class="min-w-0 flex-1">
+                    <h2 id="welcomeHeading" class="text-lg sm:text-xl font-semibold text-[var(--mt-text)] flex items-center gap-2 mb-2">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-500" aria-hidden="true"><i class="fas fa-star"></i></span>
+                        <span data-i18n="welcomeTitle">Добро пожаловать в MoneyTrack</span>
+                    </h2>
+                    <p class="text-sm text-[var(--mt-muted)] leading-relaxed max-w-2xl" data-i18n="welcomeSubtitle">Три шага — и вы уже контролируете деньги.</p>
+                    <ol class="mt-3 grid gap-2 sm:grid-cols-3 text-sm">
+                        <li class="flex gap-2 rounded-xl bg-[var(--mt-surface-2)]/80 px-3 py-2 border border-slate-600/15"><span class="font-bold text-emerald-500 tabular-nums">1</span><span data-i18n="welcomeStep1">Добавьте доход или расход</span></li>
+                        <li class="flex gap-2 rounded-xl bg-[var(--mt-surface-2)]/80 px-3 py-2 border border-slate-600/15"><span class="font-bold text-emerald-500 tabular-nums">2</span><span data-i18n="welcomeStep2">Смотрите баланс и графики</span></li>
+                        <li class="flex gap-2 rounded-xl bg-[var(--mt-surface-2)]/80 px-3 py-2 border border-slate-600/15"><span class="font-bold text-emerald-500 tabular-nums">3</span><span data-i18n="welcomeStep3">Поставьте цель сбережений</span></li>
+                    </ol>
+                </div>
+                <button type="button" id="welcomeDismissBtn" class="mt-btn-secondary shrink-0 self-stretch sm:self-center min-h-[44px] rounded-xl bg-[var(--mt-surface-2)] border border-slate-600/30 px-4 py-2 text-sm font-medium w-full lg:w-auto" data-i18n="welcomeDismiss">Понятно, начать</button>
+            </div>
+        </div>
+
+        <div class="mt-tab-panel active md:col-span-5 xl:col-span-4 md:flex md:flex-col md:gap-4 md:min-h-0 min-w-0 space-y-4" data-tab="home">
+            <article id="section-form" class="mt-section rounded-2xl border border-slate-600/20 bg-[var(--mt-surface)] p-3 sm:p-4 shadow-lg scroll-mt-24">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <i class="fas fa-plus-circle text-emerald-500" aria-hidden="true"></i>
+                    <span data-i18n="formTitle">Новая транзакция</span>
+                </h2>
+                <form id="transactionForm" class="space-y-3" novalidate autocomplete="off">
+                    <div>
+                        <label class="text-sm text-[var(--mt-muted)] flex gap-2" for="transactionName"><i class="fas fa-tag" aria-hidden="true"></i><span data-i18n="formName">Название</span></label>
+                        <input type="text" id="transactionName" maxlength="100" autocomplete="off" data-i18n-placeholder="formNamePlaceholder" class="mt-1 w-full min-h-[44px] rounded-lg bg-[var(--mt-surface-2)] border border-slate-600/30 px-3 py-2 text-[var(--mt-text)] focus:ring-2 focus:ring-emerald-500 outline-none">
+                        <p id="errName" class="form-err" role="alert"></p>
+                    </div>
+                    <div>
+                        <label class="text-sm text-[var(--mt-muted)] flex gap-2" for="transactionAmount"><i class="fas fa-coins" aria-hidden="true"></i><span data-i18n="formAmount">Сумма</span></label>
+                        <input type="text" inputmode="decimal" id="transactionAmount" autocomplete="off" class="mt-1 w-full min-h-[44px] rounded-lg bg-[var(--mt-surface-2)] border border-slate-600/30 px-3 py-2 text-[var(--mt-text)] focus:ring-2 focus:ring-emerald-500 outline-none">
+                        <p id="errAmount" class="form-err" role="alert"></p>
+                    </div>
+                    <div>
+                        <label class="text-sm text-[var(--mt-muted)] flex gap-2" for="transactionDate"><i class="fas fa-calendar" aria-hidden="true"></i><span data-i18n="formDate">Дата</span></label>
+                        <input type="date" id="transactionDate" autocomplete="off" class="mt-1 w-full min-h-[44px] rounded-lg bg-[var(--mt-surface-2)] border border-slate-600/30 px-3 py-2 text-[var(--mt-text)]">
+                    </div>
+                    <div>
+                        <label class="text-sm text-[var(--mt-muted)] flex gap-2" for="transactionCategory"><i class="fas fa-folder" aria-hidden="true"></i><span data-i18n="formCategory">Категория</span></label>
+                        <select id="transactionCategory" autocomplete="off" class="mt-1 w-full min-h-[44px] rounded-lg bg-[var(--mt-surface-2)] border border-slate-600/30 px-3 py-2 text-[var(--mt-text)]">
+                            <option value="food" data-i18n="categoryFood">🍔 Еда</option>
+                            <option value="transport" data-i18n="categoryTransport">🚗 Транспорт</option>
+                            <option value="entertainment" data-i18n="categoryEnt">🎬 Развлечения</option>
+                            <option value="health" data-i18n="categoryHealth">💊 Здоровье</option>
+                            <option value="work" data-i18n="categoryWork">💼 Работа</option>
+                            <option value="other" data-i18n="categoryOther">📦 Другое</option>
+                        </select>
+                    </div>
+                    <div>
+                        <span class="text-sm text-[var(--mt-muted)]" data-i18n="formType">Тип</span>
+                        <div class="flex gap-2 mt-1">
+                            <label class="flex-1 cursor-pointer min-h-[44px]">
+                                <input type="radio" name="transactionType" value="income" checked class="peer sr-only">
+                                <span class="block text-center rounded-lg border-2 border-transparent bg-[var(--mt-surface-2)] py-2 peer-checked:border-emerald-500 text-emerald-400 text-sm font-medium"><i class="fas fa-arrow-up" aria-hidden="true"></i> <span data-i18n="formIncome">Доход</span></span>
+                            </label>
+                            <label class="flex-1 cursor-pointer min-h-[44px]">
+                                <input type="radio" name="transactionType" value="expense" class="peer sr-only">
+                                <span class="block text-center rounded-lg border-2 border-transparent bg-[var(--mt-surface-2)] py-2 peer-checked:border-red-500 text-red-400 text-sm font-medium"><i class="fas fa-arrow-down" aria-hidden="true"></i> <span data-i18n="formExpense">Расход</span></span>
+                            </label>
+                        </div>
+                    </div>
+                    <button type="submit" id="submitTransactionBtn" class="mt-btn-primary w-full min-h-[44px] rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 px-4 flex items-center justify-center gap-2 transition shadow-sm hover:shadow-md">
+                        <i class="fas fa-check" aria-hidden="true"></i><span data-i18n="formSubmit">Добавить</span>
+                    </button>
+                </form>
+            </article>
+            <article class="rounded-2xl border border-slate-600/20 bg-[var(--mt-surface)] p-4 shadow-lg hidden md:block">
+                <h2 id="categoryStatsHeading" class="text-lg font-semibold mb-3" data-i18n="categoryStatsTitle">Траты по категориям</h2>
+                <div id="categoryStats"></div>
+            </article>
+            <article class="rounded-2xl border border-slate-600/20 bg-[var(--mt-surface)] p-4 shadow-lg hidden md:block">
+                <div class="mb-3 flex w-full flex-col gap-3">
+                    <h2 class="w-full text-lg font-semibold leading-snug" data-i18n="categoryChartTitle">Категории</h2>
+                    <div class="mt-cat-flow-seg flex w-full min-w-0 rounded-xl p-1 gap-1" role="group" aria-label="Category flow">
+                        <button type="button" class="cat-flow-tab chart-tab on flex-1 min-h-[44px] rounded-lg px-2 py-2.5 text-sm font-medium transition" data-cat-flow="expense"><span data-i18n="catFlowExpense">Расходы</span></button>
+                        <button type="button" class="cat-flow-tab chart-tab flex-1 min-h-[44px] rounded-lg px-2 py-2.5 text-sm font-medium transition" data-cat-flow="income"><span data-i18n="catFlowIncome">Доходы</span></button>
+                    </div>
+                </div>
+                <select id="categoryPeriodSelect" autocomplete="off" class="w-full mb-2 min-h-[44px] rounded-lg bg-[var(--mt-surface-2)] border border-slate-600/30 px-3 py-2 text-sm">
+                    <option value="day" data-i18n="periodDay">День</option>
+                    <option value="week" data-i18n="periodWeek">Неделя</option>
+                    <option value="month" selected data-i18n="periodMonth">Месяц</option>
+                    <option value="year" data-i18n="periodYear">Год</option>
+                </select>
+                <div id="chartObserveCat" class="chart-h"><canvas id="categoryChart" aria-label="Categories"></canvas></div>
+            </article>
+        </div>
+
+        <div class="mt-tab-panel active md:col-span-7 xl:col-span-5 md:flex md:flex-col md:gap-4 md:min-h-0 min-w-0 space-y-4" data-tab="home">
+            <article id="section-balance" class="mt-section rounded-2xl border border-slate-600/20 bg-[var(--mt-surface)] p-3 sm:p-4 shadow-lg scroll-mt-24 shrink-0">
+                <h2 class="text-base sm:text-lg font-semibold tracking-tight text-[var(--mt-text)] mb-2" data-i18n="balanceTitle">Баланс</h2>
+                <div id="totalBalance" class="text-2xl sm:text-3xl md:text-4xl font-bold text-emerald-500 min-w-0 max-w-full break-words [overflow-wrap:anywhere] tabular-nums leading-tight">0</div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+                    <div class="rounded-xl bg-[var(--mt-surface-2)] p-3 flex items-start gap-2 sm:gap-3 min-h-[44px] min-w-0 overflow-hidden">
+                        <i class="fas fa-arrow-up text-emerald-500 text-xl shrink-0 mt-0.5" aria-hidden="true"></i>
+                        <div class="min-w-0 flex-1 overflow-hidden">
+                            <div class="text-xs text-[var(--mt-muted)]" data-i18n="balanceIncome">Доходы</div>
+                            <div id="totalIncome" class="font-semibold text-emerald-400 text-sm sm:text-base break-words [overflow-wrap:anywhere] tabular-nums leading-snug">0</div>
+                        </div>
+                    </div>
+                    <div class="rounded-xl bg-[var(--mt-surface-2)] p-3 flex items-start gap-2 sm:gap-3 min-h-[44px] min-w-0 overflow-hidden">
+                        <i class="fas fa-arrow-down text-red-400 text-xl shrink-0 mt-0.5" aria-hidden="true"></i>
+                        <div class="min-w-0 flex-1 overflow-hidden">
+                            <div class="text-xs text-[var(--mt-muted)]" data-i18n="balanceExpense">Расходы</div>
+                            <div id="totalExpense" class="font-semibold text-red-400 text-sm sm:text-base break-words [overflow-wrap:anywhere] tabular-nums leading-snug">0</div>
+                        </div>
+                    </div>
+                </div>
+            </article>
+            <article id="section-transactions" class="mt-section rounded-2xl border border-slate-600/20 bg-[var(--mt-surface)] p-3 sm:p-4 shadow-lg flex flex-col flex-1 min-h-0 scroll-mt-24">
+                <div class="flex flex-col gap-3 mb-3 shrink-0">
+                    <h2 class="text-base sm:text-lg font-semibold tracking-tight flex items-center gap-2 text-[var(--mt-text)]"><i class="fas fa-list text-emerald-500" aria-hidden="true"></i><span data-i18n="txTitle">Транзакции</span></h2>
+                    <input type="search" id="transactionSearch" autocomplete="off" data-i18n-placeholder="searchPlaceholder" class="w-full min-h-[44px] rounded-lg bg-[var(--mt-surface-2)] border border-slate-600/30 px-3 py-2 text-sm md:hidden">
+                    <input type="search" id="transactionSearchDesktop" autocomplete="off" data-i18n-placeholder="searchPlaceholder" class="hidden md:block w-full min-h-[44px] rounded-lg bg-[var(--mt-surface-2)] border border-slate-600/30 px-3 py-2 text-sm">
+                    <div class="mt-tx-actions flex flex-col min-[480px]:flex-row flex-wrap gap-2 w-full min-w-0">
+                        <button type="button" id="undoBtn" class="mt-btn-secondary mt-tx-action-btn flex-1 min-h-[44px] min-w-0 rounded-lg bg-[var(--mt-surface-2)] border border-slate-600/30 px-3 py-2 text-sm"><i class="fas fa-undo shrink-0" aria-hidden="true"></i> <span class="truncate inline-block max-w-full align-bottom" data-i18n="undoLabel">Отменить</span></button>
+                        <button type="button" id="redoBtn" class="mt-btn-secondary mt-tx-action-btn flex-1 min-h-[44px] min-w-0 rounded-lg bg-[var(--mt-surface-2)] border border-slate-600/30 px-3 py-2 text-sm"><i class="fas fa-redo shrink-0" aria-hidden="true"></i> <span class="truncate inline-block max-w-full align-bottom" data-i18n="redoLabel">Вернуть</span></button>
+                        <button type="button" id="showAllBtn" class="mt-btn-secondary mt-tx-action-btn flex-1 min-h-[44px] min-w-0 rounded-lg bg-[var(--mt-surface-2)] border border-slate-600/30 px-3 py-2 text-sm"><span class="truncate block w-full text-center" data-i18n="txShowAll">Все</span></button>
+                    </div>
+                </div>
+                <div id="transactionsList" class="flex flex-col flex-1 gap-2"></div>
+            </article>
+        </div>
+
+        <div id="section-charts" class="mt-tab-panel md:col-span-12 xl:col-span-3 md:flex md:flex-col md:gap-4 md:min-h-0 min-w-0 space-y-4 scroll-mt-24" data-tab="stats">
+            <article class="rounded-2xl border border-slate-600/20 bg-[var(--mt-surface)] p-4 shadow-lg">
+                <h2 class="text-lg font-semibold mb-2" data-i18n="chartBalTitle">Динамика</h2>
+                <div id="chartObserveBalance" class="chart-h"><canvas id="balanceChart"></canvas></div>
+            </article>
+            <article class="rounded-2xl border border-slate-600/20 bg-[var(--mt-surface)] p-4 shadow-lg">
+                <h2 class="text-lg font-semibold mb-2" data-i18n="chartIETitle">Доходы и расходы</h2>
+                <div class="flex flex-wrap gap-2 mb-2">
+                    <button type="button" class="chart-tab mt-btn-chart on text-xs rounded-lg px-2 py-2 min-h-[40px]" data-chart-period="week"><span data-i18n="periodWeek">Неделя</span></button>
+                    <button type="button" class="chart-tab mt-btn-chart text-xs rounded-lg px-2 py-2 min-h-[40px]" data-chart-period="month"><span data-i18n="periodMonth">Месяц</span></button>
+                    <button type="button" class="chart-tab mt-btn-chart text-xs rounded-lg px-2 py-2 min-h-[40px]" data-chart-period="year"><span data-i18n="periodYear">Год</span></button>
+                </div>
+                <div id="chartObserveIE" class="chart-h chart-h--bar chart-ie-wrap w-full min-w-0">
+                    <canvas id="incomeExpenseChart"></canvas>
+                    <div id="incomeExpenseLegend" class="mt-chart-legend" aria-hidden="true"></div>
+                </div>
+            </article>
+            <article class="rounded-2xl border border-slate-600/20 bg-[var(--mt-surface)] p-4 shadow-lg md:hidden">
+                <h2 id="categoryStatsHeadingMobile" class="text-lg font-semibold mb-3" data-i18n="categoryStatsTitle">Категории</h2>
+                <div class="mt-cat-flow-seg mb-3 flex w-full min-w-0 rounded-xl p-1 gap-1" role="group" aria-label="Category flow">
+                    <button type="button" class="cat-flow-tab chart-tab on flex-1 min-w-0 min-h-[44px] rounded-lg px-2 py-2.5 text-sm font-medium transition" data-cat-flow="expense"><span data-i18n="catFlowExpense">Расходы</span></button>
+                    <button type="button" class="cat-flow-tab chart-tab flex-1 min-w-0 min-h-[44px] rounded-lg px-2 py-2.5 text-sm font-medium transition" data-cat-flow="income"><span data-i18n="catFlowIncome">Доходы</span></button>
+                </div>
+                <div id="categoryStatsMobile"></div>
+            </article>
+            <article class="rounded-2xl border border-slate-600/20 bg-[var(--mt-surface)] p-4 shadow-lg">
+                <h2 class="text-lg font-semibold mb-2" data-i18n="recentTitle">Недавнее</h2>
+                <div id="recentTransactions" class="space-y-2"></div>
+            </article>
+            <article class="rounded-2xl border border-slate-600/20 bg-[var(--mt-surface)] p-4 shadow-lg">
+                <h2 class="text-lg font-semibold mb-2" data-i18n="tipTitle">Совет</h2>
+                <div id="tipContent" class="text-sm text-[var(--mt-muted)] border-l-4 border-emerald-500 pl-3"></div>
+            </article>
+            <article class="rounded-2xl border border-slate-600/20 bg-[var(--mt-surface)] p-4 shadow-lg">
+                <h2 class="text-lg font-semibold mb-2" data-i18n="smartTitle">Инсайты</h2>
+                <p id="smartTips" class="mt-smart-insights text-sm text-[var(--mt-muted)] leading-relaxed"></p>
+            </article>
+        </div>
+
+        <div id="section-stats" class="mt-tab-panel mt-section md:col-span-12 min-w-0 rounded-2xl border border-slate-600/20 bg-[var(--mt-surface)] p-3 sm:p-4 shadow-lg scroll-mt-24" data-tab="stats">
+            <h2 class="text-base sm:text-lg font-semibold tracking-tight mb-3 text-[var(--mt-text)]" data-i18n="statsTitle">Статистика</h2>
+            <div class="flex flex-wrap gap-2 mb-4 border-b border-slate-600/20 pb-2">
+                <button type="button" class="stat-tab mt-btn-stat min-h-[44px] rounded-lg px-3 py-2 text-sm bg-[var(--mt-surface-2)]" data-period="day"><span data-i18n="periodDay">День</span></button>
+                <button type="button" class="stat-tab mt-btn-stat on min-h-[44px] rounded-lg px-3 py-2 text-sm bg-[var(--mt-surface-2)]" data-period="week"><span data-i18n="periodWeek">Неделя</span></button>
+                <button type="button" class="stat-tab mt-btn-stat min-h-[44px] rounded-lg px-3 py-2 text-sm bg-[var(--mt-surface-2)]" data-period="month"><span data-i18n="periodMonth">Месяц</span></button>
+                <button type="button" class="stat-tab mt-btn-stat min-h-[44px] rounded-lg px-3 py-2 text-sm bg-[var(--mt-surface-2)]" data-period="year"><span data-i18n="periodYear">Год</span></button>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div class="rounded-xl bg-[var(--mt-surface-2)] p-3"><div class="text-xs text-[var(--mt-muted)]" data-i18n="statsIncome">Доходы</div><div id="statIncome" class="text-lg font-bold text-emerald-400">0</div></div>
+                <div class="rounded-xl bg-[var(--mt-surface-2)] p-3"><div class="text-xs text-[var(--mt-muted)]" data-i18n="statsExpense">Расходы</div><div id="statExpense" class="text-lg font-bold text-red-400">0</div></div>
+                <div class="rounded-xl bg-[var(--mt-surface-2)] p-3"><div class="text-xs text-[var(--mt-muted)]" data-i18n="statsSaved">Сэкономлено</div><div id="statSaved" class="text-lg font-bold text-sky-400">0</div></div>
+                <div class="rounded-xl bg-[var(--mt-surface-2)] p-3"><div class="text-xs text-[var(--mt-muted)]" data-i18n="statsSpent">Потрачено</div><div id="statSpent" class="text-lg font-bold text-amber-400">0</div></div>
+            </div>
+            <div class="mt-4 space-y-2 rounded-xl bg-emerald-500/5 border border-emerald-500/20 p-3">
+                <div class="flex justify-between text-sm"><span data-i18n="statsBalance">Баланс</span><span id="statBalance">0</span></div>
+                <div class="flex justify-between text-sm"><span id="avgIncomeLabel" data-i18n="statsAvgIn">Средний доход</span><span id="statAvgIncome">0</span></div>
+                <div class="flex justify-between text-sm"><span id="avgExpenseLabel" data-i18n="statsAvgEx">Средний расход</span><span id="statAvgExpense">0</span></div>
+            </div>
+        </div>
+
+        <div id="section-goals" class="mt-tab-panel mt-section md:col-span-12 min-w-0 rounded-2xl border border-slate-600/20 bg-[var(--mt-surface)] p-3 sm:p-4 shadow-lg scroll-mt-24" data-tab="goals">
+            <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-bullseye text-emerald-500" aria-hidden="true"></i><span data-i18n="goalsTitle">Цели</span></h2>
+            <form id="goalForm" class="flex flex-col gap-2 mb-4" autocomplete="off" novalidate>
+                <div class="flex flex-col md:flex-row gap-2 flex-wrap">
+                    <div class="flex-1 min-w-0 md:min-w-[12rem]">
+                        <input type="text" id="goalTitle" maxlength="100" autocomplete="off" data-i18n-placeholder="goalsNamePh" class="w-full min-h-[44px] rounded-lg bg-[var(--mt-surface-2)] border border-slate-600/30 px-3 py-2" aria-describedby="errGoalTitle">
+                        <p id="errGoalTitle" class="form-err" role="alert"></p>
+                    </div>
+                    <div class="w-full md:w-44 shrink-0">
+                        <input type="text" inputmode="decimal" id="goalTarget" autocomplete="off" data-i18n-placeholder="goalsTargetPh" class="w-full min-h-[44px] rounded-lg bg-[var(--mt-surface-2)] border border-slate-600/30 px-3 py-2" aria-describedby="errGoalTarget">
+                        <p id="errGoalTarget" class="form-err" role="alert"></p>
+                    </div>
+                    <button type="submit" class="mt-btn-primary min-h-[44px] rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 font-medium w-full md:w-auto md:self-start shadow-sm" data-i18n="goalsAdd">Добавить</button>
+                </div>
+            </form>
+            <div id="goalsList" class="space-y-3"></div>
+        </div>
+
+        <div id="section-profile" class="mt-tab-panel mt-section md:col-span-12 min-w-0 rounded-2xl border border-slate-600/20 bg-[var(--mt-surface)] p-3 sm:p-4 shadow-lg space-y-4 scroll-mt-24" data-tab="profile">
+            <h2 class="text-base sm:text-lg font-semibold tracking-tight" data-i18n="profileTitle">Профиль</h2>
+            <section class="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4" aria-labelledby="achievementsHeading">
+                <h3 id="achievementsHeading" class="text-sm font-semibold text-[var(--mt-text)] mb-3 flex items-center gap-2">
+                    <i class="fas fa-trophy text-amber-400" aria-hidden="true"></i>
+                    <span data-i18n="achievementsTitle">Достижения</span>
+                </h3>
+                <p class="mt-ach-intro text-xs text-[var(--mt-muted)] mb-3 text-justify text-pretty" data-i18n="achievementsIntro">Наведите на значок, чтобы узнать, как получить награду.</p>
+                <div id="achievementsGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2"></div>
+            </section>
+            <h3 class="mt-4 text-sm font-semibold text-[var(--mt-text)] mb-2" data-i18n="profileStatsTitle">Ваша активность</h3>
+            <div id="profileEngagementStats" class="rounded-xl border border-slate-600/20 bg-[var(--mt-surface-2)]/50 p-4 text-sm" aria-live="polite"></div>
+            <div class="md:hidden flex flex-col gap-2">
+                <label class="text-sm text-[var(--mt-muted)]" for="currencySelectMobile" data-i18n="profileCurrency">Валюта</label>
+                <select id="currencySelectMobile" autocomplete="off" class="min-h-[44px] rounded-lg bg-[var(--mt-surface-2)] border border-slate-600/30 px-3 py-2 w-full max-w-full mt-select-header"></select>
+            </div>
+            <p class="text-xs text-[var(--mt-muted)] leading-relaxed text-justify text-pretty border-t border-slate-600/15 pt-4" data-i18n="exportHelp">Экспорт и импорт</p>
+            <div class="flex flex-col sm:flex-row flex-wrap gap-2">
+                <button type="button" id="exportXlsxBtn" class="mt-btn-secondary w-full sm:w-auto min-h-[44px] rounded-lg bg-[var(--mt-surface-2)] border border-slate-600/30 px-4 py-2 text-sm" data-i18n="exportXlsx">XLSX</button>
+                <button type="button" id="exportJsonBtn" class="mt-btn-secondary w-full sm:w-auto min-h-[44px] rounded-lg bg-[var(--mt-surface-2)] border border-slate-600/30 px-4 py-2 text-sm" data-i18n="exportJson">JSON</button>
+                <button type="button" id="importXlsxBtn" class="mt-btn-secondary w-full sm:w-auto min-h-[44px] rounded-lg bg-[var(--mt-surface-2)] border border-slate-600/30 px-4 py-2 text-sm" data-i18n="importXlsx">Импорт XLSX</button>
+                <button type="button" id="importJsonBtn" class="mt-btn-secondary w-full sm:w-auto min-h-[44px] rounded-lg bg-[var(--mt-surface-2)] border border-slate-600/30 px-4 py-2 text-sm" data-i18n="importJson">Импорт JSON</button>
+            </div>
+            <input type="file" id="importXlsxFile" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" class="hidden" autocomplete="off">
+            <input type="file" id="importJsonFile" accept=".json,application/json" class="hidden" autocomplete="off">
+        </div>
+    </main>
+
+    <nav class="bottom-nav-mt md:hidden" aria-label="Mobile navigation">
+        <button type="button" class="mt-btn-nav on" data-nav="home"><i class="fas fa-home text-lg" aria-hidden="true"></i><span data-i18n="navHome">Главная</span></button>
+        <button type="button" class="mt-btn-nav" data-nav="stats"><i class="fas fa-chart-pie text-lg" aria-hidden="true"></i><span data-i18n="navStats">Статистика</span></button>
+        <button type="button" class="mt-btn-nav" data-nav="goals"><i class="fas fa-bullseye text-lg" aria-hidden="true"></i><span data-i18n="navGoals">Цели</span></button>
+        <button type="button" class="mt-btn-nav" data-nav="profile"><i class="fas fa-user text-lg" aria-hidden="true"></i><span data-i18n="navProfile">Профиль</span></button>
+    </nav>
+
+    <footer class="mt-8 border-t border-slate-600/20 py-6 text-center text-sm text-[var(--mt-muted)] hidden md:block">
+        <p>&copy; 2026 MoneyTrack. <span data-i18n="footerCopy">Все права защищены.</span></p>
+    </footer>
+
+    <div id="allTransactionsModal" class="modal-mt" role="dialog" aria-modal="true" aria-labelledby="allTxTitle">
+        <div class="modal-panel">
+            <div class="modal-head">
+                <h2 id="allTxTitle" class="text-lg font-semibold" data-i18n="modalAllTx">Все транзакции</h2>
+                <button type="button" id="closeModal" class="mt-btn-icon text-[var(--mt-muted)] p-2 rounded-lg hover:bg-[var(--mt-surface-2)]" aria-label="Close"><i class="fas fa-times" aria-hidden="true"></i></button>
+            </div>
+            <div class="modal-scroll">
+                <div id="allTransactionsList" class="flex flex-col gap-2 max-h-[55vh] overflow-y-auto"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="editModal" class="modal-mt" role="dialog" aria-modal="true">
+        <div class="modal-panel max-w-lg">
+            <div class="modal-head">
+                <h2 class="text-lg font-semibold" data-i18n="editTitle">Редактирование</h2>
+                <button type="button" id="closeEditModal" class="mt-btn-icon text-[var(--mt-muted)] p-2 rounded-lg hover:bg-[var(--mt-surface-2)]" aria-label="Close"><i class="fas fa-times" aria-hidden="true"></i></button>
+            </div>
+            <div class="modal-scroll space-y-3">
+                <input type="hidden" id="editId" autocomplete="off">
+                <div>
+                    <label class="text-sm text-[var(--mt-muted)]" for="editName" data-i18n="formName">Название</label>
+                    <input type="text" id="editName" maxlength="100" autocomplete="off" class="mt-1 w-full min-h-[44px] rounded-lg bg-[var(--mt-surface-2)] border border-slate-600/30 px-3 py-2">
+                    <p id="editErrName" class="form-err"></p>
+                </div>
+                <div>
+                    <label class="text-sm text-[var(--mt-muted)]" for="editAmount" data-i18n="formAmount">Сумма</label>
+                    <input type="text" inputmode="decimal" id="editAmount" autocomplete="off" class="mt-1 w-full min-h-[44px] rounded-lg bg-[var(--mt-surface-2)] border border-slate-600/30 px-3 py-2">
+                    <p id="editErrAmount" class="form-err"></p>
+                </div>
+                <div>
+                    <label class="text-sm text-[var(--mt-muted)]" for="editDate" data-i18n="formDate">Дата</label>
+                    <input type="date" id="editDate" autocomplete="off" class="mt-1 w-full min-h-[44px] rounded-lg bg-[var(--mt-surface-2)] border border-slate-600/30 px-3 py-2">
+                </div>
+                <div>
+                    <label class="text-sm text-[var(--mt-muted)]" for="editCategory" data-i18n="formCategory">Категория</label>
+                    <select id="editCategory" autocomplete="off" class="mt-1 w-full min-h-[44px] rounded-lg bg-[var(--mt-surface-2)] border border-slate-600/30 px-3 py-2"></select>
+                </div>
+                <div>
+                    <span class="text-sm text-[var(--mt-muted)]" data-i18n="formType">Тип</span>
+                    <div class="flex gap-2 mt-1">
+                        <label class="flex-1 cursor-pointer"><input type="radio" name="editType" value="income" class="peer sr-only"><span class="block text-center rounded-lg border-2 border-transparent bg-[var(--mt-surface-2)] py-2 peer-checked:border-emerald-500 text-sm text-emerald-400" data-i18n="formIncome">Доход</span></label>
+                        <label class="flex-1 cursor-pointer"><input type="radio" name="editType" value="expense" class="peer sr-only"><span class="block text-center rounded-lg border-2 border-transparent bg-[var(--mt-surface-2)] py-2 peer-checked:border-red-500 text-sm text-red-400" data-i18n="formExpense">Расход</span></label>
+                    </div>
+                </div>
+                <div class="flex flex-col sm:flex-row gap-2 pt-2">
+                    <button type="button" id="saveEditBtn" class="mt-btn-primary flex-1 min-h-[44px] rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white py-2 font-medium shadow-sm" data-i18n="editSave">Сохранить</button>
+                    <button type="button" id="deleteEditBtn" class="mt-btn-danger min-h-[44px] rounded-lg bg-red-600 hover:bg-red-600 text-white px-4 py-2" data-i18n="editDelete">Удалить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="importModal" class="modal-mt" role="dialog" aria-modal="true">
+        <div class="modal-panel max-w-lg">
+            <div class="modal-head">
+                <h2 class="text-lg font-semibold" data-i18n="importMapTitle">Импорт</h2>
+                <button type="button" id="closeImportModal" class="mt-btn-icon text-[var(--mt-muted)] p-2 rounded-lg hover:bg-[var(--mt-surface-2)]"><i class="fas fa-times" aria-hidden="true"></i></button>
+            </div>
+            <div class="modal-scroll space-y-3" id="importMapBody"></div>
+            <div class="p-4 border-t border-slate-600/20">
+                <button type="button" id="confirmImportBtn" class="mt-btn-primary w-full min-h-[44px] rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white py-2 shadow-sm" data-i18n="importConfirm">Импорт</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirmModal" class="modal-mt" role="dialog" aria-modal="true">
+        <div id="confirmModalPanel" class="modal-panel max-w-sm">
+            <div class="modal-head">
+                <h2 id="confirmModalTitle" class="text-lg font-semibold">Подтверждение</h2>
+                <button type="button" id="closeConfirmModal" class="mt-btn-icon text-[var(--mt-muted)] p-2 rounded-lg hover:bg-[var(--mt-surface-2)]"><i class="fas fa-times" aria-hidden="true"></i></button>
+            </div>
+            <div class="modal-scroll space-y-4">
+                <p id="confirmMessage" class="text-[var(--mt-text)]"></p>
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <button type="button" id="confirmCancelBtn" class="mt-btn-secondary flex-1 min-h-[44px] rounded-lg bg-[var(--mt-surface-2)] border border-slate-600/20 py-2" data-i18n="confirmCancel">Отмена</button>
+                    <button type="button" id="confirmOkBtn" class="mt-btn-primary flex-1 min-h-[44px] rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white py-2 shadow-sm">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <button type="button" id="scrollTopFab" class="mt-scroll-top-fab mt-btn-icon" hidden aria-label="Наверх">
+        <i class="fas fa-arrow-up" aria-hidden="true"></i>
+    </button>
+
+    <script src="js/moneytrack-i18n.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/validation-service.js"></script>
+    <script src="js/storage-service.js"></script>
+    <script src="js/notification-service.js"></script>
+    <script src="js/undo-redo-service.js"></script>
+    <script src="js/chart-service.js"></script>
+    <script src="js/finance-app.js"></script>
+    <script src="js/bootstrap.js"></script>
+    
+</body>
+</html>
